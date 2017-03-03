@@ -36,14 +36,16 @@ def GetColorHistFeatures(img, nrOfBins=32, isVisualization=False):
         return histFeatures, histR, histG, histB, binCenters
 
 def ExtractFeatures(img):
+    normImg = np.empty_like(img)
+    cv2.normalize(img, normImg, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
     # Extract HOG features
-    hlsImg = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
+    hsvImg = cv2.cvtColor(normImg, cv2.COLOR_BGR2HSV)
     hogFeatures = []
-    for channelNr in range(hlsImg.shape[2]):
-        hogFeatures.append(GetHogFeatures(hlsImg[:,:,channelNr], nrOfOrientations=9, pxPerCell=8, cellPerBlk=2))
+    for channelNr in range(hsvImg.shape[2]):
+        hogFeatures.append(GetHogFeatures(hsvImg[:,:,channelNr], nrOfOrientations=9, pxPerCell=8, cellPerBlk=2))
     hogFeatures = np.ravel(hogFeatures)
     # Extract spatial features
-    spatialFeatures = GetSpatialFeatures(hlsImg, size=(32, 32))
+    spatialFeatures = GetSpatialFeatures(hsvImg, size=(32, 32))
     # Extract color histogram features
-    histFeatures = GetColorHistFeatures(cv2.cvtColor(img, cv2.COLOR_BGR2HSV), nrOfBins=32)
+    histFeatures = GetColorHistFeatures(cv2.cvtColor(normImg, cv2.COLOR_BGR2HLS), nrOfBins=32)
     return np.concatenate((hogFeatures, spatialFeatures, histFeatures))

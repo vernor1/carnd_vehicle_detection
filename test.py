@@ -1,40 +1,11 @@
 import argparse
 import cv2
-import glob
 import matplotlib.pyplot as plt
 import numpy as np
-import os.path
-import pickle
 
+from classifier import GetTrainingSamples, GetTrainingSet, TrainClassifier
 from feature_extraction import GetHogFeatures, GetSpatialFeatures, GetColorHistFeatures, ExtractFeatures
-
-TRAIN_SAMPLES_FILE = "train_samples.p"
-
-def GetTrainSamples(vehiclesDirectory, nonVehiclesDirectory):
-    vehicles = []
-    nonVehicles = []
-    trainSamples = {}
-    if os.path.isfile(TRAIN_SAMPLES_FILE):
-        print("Loading train samples")
-        trainSamples = pickle.load(open(TRAIN_SAMPLES_FILE, "rb"))
-        vehicles = trainSamples["vehicles"]
-        nonVehicles = trainSamples["non-vehicles"]
-        print("Loaded %d samples of vehicles" % (len(vehicles)))
-        print("Loaded %d samples of non-vehicles" % (len(nonVehicles)))
-    else:
-        print("Searching for vehicle samples")
-        for fileName in glob.iglob("%s/**/*.png" % (vehiclesDirectory), recursive=True):
-            vehicles.append(cv2.imread(fileName))
-        print("Loaded %d samples" % (len(vehicles)))
-        print("Searching for non-vehicle samples")
-        for fileName in glob.iglob("%s/**/*.png" % (nonVehiclesDirectory), recursive=True):
-            nonVehicles.append(cv2.imread(fileName))
-        print("Loaded %d samples" % (len(nonVehicles)))
-        # Save the samples for fast access
-        trainSamples["vehicles"] = vehicles
-        trainSamples["non-vehicles"] = nonVehicles
-        pickle.dump(trainSamples, open(TRAIN_SAMPLES_FILE, "wb"))
-    return vehicles, nonVehicles
+from sklearn.model_selection import train_test_split
 
 
 # The following code is only used for debugging and generating test images
@@ -42,19 +13,19 @@ def GetTrainSamples(vehiclesDirectory, nonVehiclesDirectory):
 if __name__ == '__main__':
     argParser = argparse.ArgumentParser(description="Test Pipeline Components")
     argParser.add_argument("type",
-                           choices=["class_examples", "feature_extraction"])
-    argParser.add_argument("out_img",
-                           type=str,
-                           help="Path to the plot file of the applied transformation")
+                           choices=["class_examples", "feature_extraction", "classifier"])
     argParser.add_argument("--in_img",
                            type=str,
                            help="Path to the original image file")
+    argParser.add_argument("--out_img",
+                           type=str,
+                           help="Path to the plot file of the applied transformation")
     args = argParser.parse_args()
 
 #    img = cv2.imread(args.in_img)
-    vehicles, nonVehicles = GetTrainSamples("vehicles", "non-vehicles")
     
     if args.type == "class_examples":
+        vehicles, nonVehicles = GetTrainingSamples("vehicles", "non-vehicles")
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8,4))
         fig.tight_layout()
         vehicleIdx = np.random.randint(len(vehicles))
@@ -67,6 +38,7 @@ if __name__ == '__main__':
         fig.savefig(args.out_img)
 
     if args.type == "feature_extraction":
+        vehicles, nonVehicles = GetTrainingSamples("vehicles", "non-vehicles")
         fig, ((ax1, ax2),
               (ax3, ax4),
               (ax5, ax6),
@@ -140,3 +112,11 @@ if __name__ == '__main__':
         ax20.set_title("Non-vehicle Color Hist. Features (V)", fontsize=12)
         plt.subplots_adjust(left=0.05, right=0.95, top=0.99, bottom=0.01)
         fig.savefig(args.out_img)
+
+    if args.type == "classifier":
+        X_train, y_train = GetTrainingSet("vehicles", "non-vehicles")
+        rand_state = np.random.randint(0, 100)
+        X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=rand_state)
+        print("Training classifier")
+        classifier = TrainClassifier(X_train, y_train)
+        print("Test accuracy %.4f" % (classifier.score(X_test, y_test)))

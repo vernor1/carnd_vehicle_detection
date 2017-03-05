@@ -15,7 +15,6 @@ class TClassifier():
     """
     # Constants ---------------------------------------------------------------
     TRAINING_SET_FILE = "training_set.p"
-    TRAINING_SAMPLES_FILE = "training_samples.p"
     CLASSIFIER_DATA_FILE = "classifier_data.p"
 
     # Public Members ----------------------------------------------------------
@@ -83,30 +82,3 @@ class TClassifier():
 
     def Predict(self, featureList):
         return self.Classifier.predict(featureList)
-
-    # Private Members ---------------------------------------------------------
-    def GetTrainingSamples(self):
-        vehicles = []
-        nonVehicles = []
-        trainingSamples = {}
-        if os.path.isfile(self.TRAINING_SAMPLES_FILE):
-            print("Loading training samples")
-            trainingSamples = pickle.load(open(self.TRAINING_SAMPLES_FILE, "rb"))
-            vehicles = trainingSamples["vehicles"]
-            nonVehicles = trainingSamples["non-vehicles"]
-            print("Loaded %d samples of vehicles" % (len(vehicles)))
-            print("Loaded %d samples of non-vehicles" % (len(nonVehicles)))
-        else:
-            print("Searching for vehicle samples")
-            for fileName in glob.iglob("%s/**/*.png" % (self.VehiclesDirectory), recursive=True):
-                vehicles.append(cv2.imread(fileName))
-            print("Loaded %d samples" % (len(vehicles)))
-            print("Searching for non-vehicle samples")
-            for fileName in glob.iglob("%s/**/*.png" % (self.NonVehiclesDirectory), recursive=True):
-                nonVehicles.append(cv2.imread(fileName))
-            print("Loaded %d samples" % (len(nonVehicles)))
-            # Save the samples for fast access
-            trainingSamples["vehicles"] = vehicles
-            trainingSamples["non-vehicles"] = nonVehicles
-            pickle.dump(trainingSamples, open(self.TRAINING_SAMPLES_FILE, "wb"))
-        return vehicles, nonVehicles

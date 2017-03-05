@@ -1,11 +1,12 @@
 import argparse
 import cv2
+import glob
 import matplotlib.pyplot as plt
 import numpy as np
 
-from classifier import GetTrainingSamples, GetTrainingSet, TrainClassifier
+from classifier import TClassifier
 from feature_extraction import GetHogFeatures, GetSpatialFeatures, GetColorHistFeatures, ExtractFeatures
-from sklearn.model_selection import train_test_split
+from vehicle_tracking import GetBoundingBoxes, GetHeatMap
 
 
 # The following code is only used for debugging and generating test images
@@ -13,7 +14,7 @@ from sklearn.model_selection import train_test_split
 if __name__ == '__main__':
     argParser = argparse.ArgumentParser(description="Test Pipeline Components")
     argParser.add_argument("type",
-                           choices=["class_examples", "feature_extraction", "classifier"])
+                           choices=["class_examples", "feature_extraction", "vehicle_tracking"])
     argParser.add_argument("--in_img",
                            type=str,
                            help="Path to the original image file")
@@ -22,10 +23,9 @@ if __name__ == '__main__':
                            help="Path to the plot file of the applied transformation")
     args = argParser.parse_args()
 
-#    img = cv2.imread(args.in_img)
-    
     if args.type == "class_examples":
-        vehicles, nonVehicles = GetTrainingSamples("vehicles", "non-vehicles")
+        classifier = TClassifier("vehicles", "non-vehicles")
+        vehicles, nonVehicles = classifier.GetTrainingSamples()
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8,4))
         fig.tight_layout()
         vehicleIdx = np.random.randint(len(vehicles))
@@ -113,10 +113,24 @@ if __name__ == '__main__':
         plt.subplots_adjust(left=0.05, right=0.95, top=0.99, bottom=0.01)
         fig.savefig(args.out_img)
 
-    if args.type == "classifier":
-        X_train, y_train = GetTrainingSet("vehicles", "non-vehicles")
-        rand_state = np.random.randint(0, 100)
-        X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=rand_state)
-        print("Training classifier")
-        classifier = TrainClassifier(X_train, y_train)
-        print("Test accuracy %.4f" % (classifier.score(X_test, y_test)))
+    if args.type == "vehicle_tracking":
+        testFiles = []
+        for fileName in glob.glob(args.in_img):
+            testFiles.append(fileName)
+        classifier = TClassifier("vehicles", "non-vehicles")
+        fig, subplots = plt.subplots(len(testFiles), 2, figsize=(8, len(testFiles) * 2.5))
+        fig.tight_layout()
+        row = 0
+        for fileName in testFiles:
+            print("Processing %s" % (fileName))
+            img = cv2.imread(fileName)
+            boundingBoxes = GetBoundingBoxes(classifier, img, (380, 660))
+            for box in boundingBoxes:
+                cv2.rectangle(img, box[0], box[1], (255, 0, 0), 3)
+            subplots[row][0].imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            subplots[row][0].set_title("Detections", fontsize=12)
+            subplots[row][1].imshow(GetHeatMap(img, boundingBoxes), cmap="hot")
+            subplots[row][1].set_title("Heat Map", fontsize=12)
+            row += 1
+        plt.subplots_adjust(left=0.05, right=0.95, top=0.98, bottom=0.02)
+        fig.savefig(args.out_img)

@@ -36,12 +36,23 @@ You're reading it!
 
 The training images are loaded by the classifier class `TClassifier` defined in `classifier.py`. The class constructor recursively searches the provided directories with vehicle and non-vehicle images of resolution 64x64, then loads and labels the samples. Here's an example of vehicle and non-vehicle images:
 
-![alt text][image1]
+<p align="center">
+    <img src="./examples/class_examples.png" alt="Class Examples" width="500"/>
+</p>
 
 After loading the samples, the `TClassifier` constructor extracts HOG, spatial and color histogram features of each sample image using function `ExtractFeatures()` located in `feature_extraction.py`. The function essentially combines features extracted by three different methods:
 * `GetHogFeatures()`: Extracts HOG features of the image channel using `skimage.feature.hog()`
 * `GetSpatialFeatures()`: Extracts spatial features of the image
 * `GetColorHistFeatures()`: Extracts color histogram features of the image
+
+Here is an example using the YCrCb color space, HOG parameters of 9 orientations, 8 px per cell, 2 cells per block, spatial size 32x32 and 32 color histogram bins:
+
+<p align="center">
+    <img src="./examples/feature_extraction.png" alt="Feature Extraction" width="500"/>
+</p>
+
+
+####2. Explain how you settled on your final choice of HOG parameters.
 
 I explored multiple color spaces and came up with the following rank of color spaces when training and testing the classifier with a single type (the test accuracy is shown in parentheses):
 
@@ -57,18 +68,6 @@ Also I experimented with other meta parameters:
 * HOG parameters: number of orientations appeared to be good in range 7-9, cells per block is 2. Decreasing the values reduces accuracy significantly; increasing it doesn't improve accuracy, but affects performance.
 * Spatial sizes 16x16, 32x32 and 48x48 are almost equally good.
 * Color histogram, number of bins is only good as 32. Decreasing it affect accuracy; increasing doesn't improve anything, but affects performance.
-
-Here is an example using the YCrCb color space, HOG parameters of 9 orientations, 8 px per cell, 2 cells per block, spatial size 32x32 and 32 color histogram bins:
-
-<p align="center">
-    <img src="./examples/feature_extraction.png" alt="Feature Extraction" width="500"/>
-</p>
-
-![alt text][image2]
-
-####2. Explain how you settled on your final choice of HOG parameters.
-
-I tried various combinations of parameters and...
 
 ####3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
 

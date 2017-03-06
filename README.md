@@ -52,9 +52,9 @@ Here is an example using the YCrCb color space, HOG parameters of 9 orientations
 </p>
 
 
-####2. Explain how you settled on your final choice of HOG parameters.
+#### 2. Explain how you settled on your final choice of HOG parameters.
 
-I explored multiple color spaces and came up with the following rank of color spaces when training and testing the classifier with a single type (the test accuracy is shown in parentheses):
+I explored multiple color spaces and came up with the following rank of color spaces when training and testing the classifier with a single type (average test accuracy after 5-10 runs is shown in parentheses):
 
 | Feature Type | 1st place    | 2nd place      | 3rd place      |
 |--------------|--------------|----------------|----------------|
@@ -69,13 +69,13 @@ Also I experimented with other meta parameters:
 * Spatial sizes 16x16, 32x32 and 48x48 are almost equally good.
 * Color histogram, number of bins is only good as 32. Decreasing it affect accuracy; increasing doesn't improve anything, but affects performance.
 
-####3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
+#### 3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
 
-I trained a linear SVM using...
+The classifier is implemented in `TClassifier` class defined in `classifier.py`. I used `sklearn.svm.LinearSVC` classifier trained with [vehicle](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/vehicles.zip) and [non-vehicle](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/non-vehicles.zip) sample images combined of [GTI](http://www.gti.ssr.upm.es/data/Vehicle_database.html) and [KITTI](http://www.cvlibs.net/datasets/kitti/) databases. The training and testing of the classifier is done right after normalizing the feature vectors in the end of `TClassifier` constructor.
 
-###Sliding Window Search
+### Sliding Window Search
 
-####1. Describe how (and identify where in your code) you implemented a sliding window search.  How did you decide what scales to search and how much to overlap windows?
+#### 1. Describe how (and identify where in your code) you implemented a sliding window search.  How did you decide what scales to search and how much to overlap windows?
 
 I decided to search random window positions at random scales all over the image and came up with this (ok just kidding I didn't actually ;):
 

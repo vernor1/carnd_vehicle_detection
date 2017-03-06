@@ -83,8 +83,9 @@ Here's a [link to my video result](https://youtu.be/cGvuKVzHfnY)
 #### 2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
 
 I implemented a simplistic, yet reliable solution to track detected vehicles, filter out false positives and produce smoothed bounding boxes. There are two parts of the solution:
-1) `TVehicleTracker` class implements a "historical" heat map over last 8 frames of the video stream. The heat map is computed every frame as a sum of "historical" bounding boxes, see `GetHistoricalBoundingBoxes()`. The resulting heat map is thresholded by number of samples in the history (up to 8), and passed to `scipy.ndimage.measurements.label()` in order to identify independent connected components, presumably representing vehicles, see `GetLabels()`. The heat map history length of 8 is enough for producing reliable car detections, and not too long to produce "trails" of moving vehicles. This approach filters out most false positives, but the toughest ones handled in other way.
-2) `TVehicle` class implements the second stage of vehicle detection and tracking, given the "historical" bounding boxes produced by `TVehicleTracker`. An instance of `TVehicle` is created by method `TVehicleTracker::UpdateVehicles()` for each valid bounding box not accepted by any existing `TVehicle` instance. A bounding box is considered invalid, if any of its dimensions is below 48 px. An updated bounding box is accepted by a `TVehicle` instance in method `UpdateVehicle()`, if the distance between the vehicle center and the new bounding box center is below 128 px. In case of multiple occurences, only the closest bounding box is taken. `TVehicle` maintains a history of recent bounding boxes, computing the average boinding box, see `TVehicle::GetBoundingBox()`. A new `TVehicle` instance is not considered a true vehicle until the lock is acquired (state `LOCKED`), which happens only when there are 12 bounding boxes in the history. The value of 12 is chosen as half of the project video frame rate (25fps), meaning each vehicle is detected within 0.5s. This time is enough for a reliable detection of a real vehicle, but not that long for missing a danger. If the frame doesn't containg matching detections, the history truncates and the vehicle state changes to `LOCKING`. Once the history gets empty, the vehicles is considered lost (state `UNLOCKED`) and gets removed.
+
+1. `TVehicleTracker` class implements a "historical" heat map over last 8 frames of the video stream. The heat map is computed every frame as a sum of "historical" bounding boxes, see `GetHistoricalBoundingBoxes()`. The resulting heat map is thresholded by number of samples in the history (up to 8), and passed to `scipy.ndimage.measurements.label()` in order to identify independent connected components, presumably representing vehicles, see `GetLabels()`. The heat map history length of 8 is enough for producing reliable car detections, and not too long to produce "trails" of moving vehicles. This approach filters out most false positives, but the toughest ones handled in other way.
+2. `TVehicle` class implements the second stage of vehicle detection and tracking, given the "historical" bounding boxes produced by `TVehicleTracker`. An instance of `TVehicle` is created by method `TVehicleTracker::UpdateVehicles()` for each valid bounding box not accepted by any existing `TVehicle` instance. A bounding box is considered invalid, if any of its dimensions is below 48 px. An updated bounding box is accepted by a `TVehicle` instance in method `UpdateVehicle()`, if the distance between the vehicle center and the new bounding box center is below 128 px. In case of multiple occurences, only the closest bounding box is taken. `TVehicle` maintains a history of recent bounding boxes, computing the average boinding box, see `TVehicle::GetBoundingBox()`. A new `TVehicle` instance is not considered a true vehicle and not assigned an Id until the lock is acquired (state `LOCKED`), which happens only when the history is full. The value of 12 is chosen as half of the project video frame rate (25fps), meaning each vehicle is detected within 0.5s. This time is enough for a reliable detection of a real vehicle, but not that long for missing a danger. If the frame doesn't containg matching detections, the history truncates and the vehicle state changes to `LOCKING`, which handles short detection failures. Once the history gets empty, the vehicles is considered lost (state `UNLOCKED`) and gets removed by `TVehicleTracker`.
 
 The two-stage approach demontstrated a pretty good reliability and robustness to false positives. The following picture shows the result of processing a sequence of 7 stream pictures, using the approach above with a 7-frame `TVehicle` history:
 
@@ -93,7 +94,8 @@ The two-stage approach demontstrated a pretty good reliability and robustness to
 </p>
 
 The execution log:
-`(carnd-term1) Yurys-MacBook-Pro:vehicle_detection vernor$ python test.py vehicle_tracking --in_img "test_images/0*.jpg" --out_img examples/vehicle_tracking.png
+```
+(carnd-term1) Yurys-MacBook-Pro:vehicle_detection vernor$ python test.py vehicle_tracking --in_img "test_images/0*.jpg" --out_img examples/vehicle_tracking.png
 Loading classifier data
 Processing 001.jpg
 Creating nameless vehicle object with box ((800, 380), (959, 523))
@@ -134,8 +136,8 @@ Vehicle Ids {1}
 Checking vehicle Id 0, state LOCKED
 Creating vehicle Id 2
 Vehicle Ids {1, 2}
-2 vehicles found`
-
+2 vehicles found
+```
 ---
 ### Discussion
 

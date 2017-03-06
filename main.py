@@ -11,9 +11,6 @@ from vehicle_tracker import TVehicleTracker
 Classifier = TClassifier("vehicles", "non-vehicles")
 Tracker = TVehicleTracker(Classifier, (380, 660))
 
-# FIXME: remove
-FrameNr = 0
-
 # Functions ------------------------------------------------------------
 def ProcessImage(img):
     """ Processes an RGB image for detecting vehicles.
@@ -22,10 +19,6 @@ def ProcessImage(img):
     param: img: Image to process
     returns: Processed RGB image
     """
-
-    # FIXME: remove
-    global FrameNr
-    FrameNr += 1
 
     # Convert the RGB image of MoviePy to BGR format of OpenCV
     outImg = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
@@ -38,8 +31,6 @@ def ProcessImage(img):
         cv2.rectangle(outImg, boxLeftTop, boxRightBottom, (0, 255, 255), 2)
         cv2.putText(outImg, "Vehicle %d" % (vehicleIds[idx]),
                     (boxLeftTop[0]+5, boxLeftTop[1]+15), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
-    # FIXME: remove
-    cv2.imwrite("tmp/%04d.bmp" % (FrameNr), outImg)
     # Convert the processed image back to the RGB format comatible with MoviePy
     outImg = cv2.cvtColor(outImg, cv2.COLOR_BGR2RGB)
     return outImg

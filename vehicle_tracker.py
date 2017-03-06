@@ -145,7 +145,7 @@ class TVehicleTracker():
     WINDOW_SIZE_PX = 64
     SCALES = [1.0, 1.5, 2.0]
     # Max heat map history length
-    MAX_HISTORY_LENGTH = 12
+    MAX_HISTORY_LENGTH = 8
     MAX_VEHICLE_ID = 20
     # Min dimensions of a valid bounding box
     MIN_BOX_WIDTH = 48
@@ -280,22 +280,6 @@ class TVehicleTracker():
             boundingBoxes.append(box)
         return boundingBoxes
 
-    def RemoveInvalidBoxes(self, boundingBoxes):
-        """ Removes invalid bounding boxes.
-
-        param: boundingBoxes: A sequence of bounding boxes
-        returns: Only valid bounding boxes
-        """
-        validBoxes = []
-        for box in boundingBoxes:
-            width = box[1][0] - box[0][0]
-            height = box[1][1] - box[0][1]
-            if width >= self.MIN_BOX_WIDTH and height >= self.MIN_BOX_HEIGHT:
-                validBoxes.append(box)
-            else:
-                print("Discard invalid box %s" % (box,))
-        return validBoxes
-
     def CreateVehicleId(self):
         """ Creates a unique vehicle Id and updates the list of them.
 
@@ -312,8 +296,39 @@ class TVehicleTracker():
 
         param: box: Initial bounding box
         """
-        print("Creating nameless vehicle object")
+        print("Creating nameless vehicle object with box %s" % (box,))
         self.Vehicles.append(self.TVehicle(box))
+
+    def RemoveInvalidBoxes(self, boundingBoxes):
+        """ Removes invalid bounding boxes.
+
+        param: boundingBoxes: A sequence of bounding boxes
+        returns: Remaining valid bounding boxes
+        """
+        validBoxes = []
+        for box in boundingBoxes:
+            width = box[1][0] - box[0][0]
+            height = box[1][1] - box[0][1]
+            if width >= self.MIN_BOX_WIDTH and height >= self.MIN_BOX_HEIGHT:
+                validBoxes.append(box)
+            else:
+                print("Discard invalid box %s" % (box,))
+        return validBoxes
+
+    def UpdateVehiclesInState(self, boundingBoxes, state):
+        """ Updates every vehicle object in given state with bounding boxes.
+
+        param: boundingBoxes: A sequence of bounding boxes
+        param: state: A vehicle state
+        returns: Remaining bounding boxes, which haven't been processed
+        """
+        for vehicle in self.Vehicles:
+            if vehicle.GetLockState() == state:
+                processedIdx = vehicle.Update(boundingBoxes)
+                if processedIdx != None:
+                    # Remove the processed bounding box
+                    del boundingBoxes[processedIdx]
+        return boundingBoxes
 
     def UpdateVehicles(self):
         """ Updates, creates or deletes vehicle objects.
@@ -322,34 +337,34 @@ class TVehicleTracker():
         boundingBoxes = self.GetHistoricalBoundingBoxes()
         # Remove invalid boxes
         boundingBoxes = self.RemoveInvalidBoxes(boundingBoxes)
-        processedBoxIndices = set()
-        for vehicle in self.Vehicles:
-            # Ask every vehicle object to process bounding boxes
-            processedIdx = vehicle.Update(boundingBoxes)
-            if processedIdx != None:
-                processedBoxIndices.add(processedIdx)
-        # Iterate through historical bounding boxes
-        for idx in range(len(boundingBoxes)):
-            if idx not in processedBoxIndices:
-                # The valid box is not processed by any vehicle, create a new vehicle
-                self.CreateVehicle(boundingBoxes[idx])
+        boundingBoxes = self.UpdateVehiclesInState(boundingBoxes, "LOCKED")
+        boundingBoxes = self.UpdateVehiclesInState(boundingBoxes, "LOCKING")
+        # If a valid box is not processed by any vehicle, create a new vehicle
+        for box in boundingBoxes:
+            self.CreateVehicle(box)
+        # Maintain the vehicles after updating
         unlockedVehicleIndices = []
         for idx in range(len(self.Vehicles)):
-            # Notify vehicles of completing the update
             vehicleId = self.Vehicles[idx].GetId()
             lockState = self.Vehicles[idx].GetLockState()
             print("Checking vehicle Id %d, state %s" % (vehicleId, lockState))
             if lockState == "LOCKED":
                 if vehicleId == 0:
+                    # Assign an Id to the just locked vehicle
                     self.Vehicles[idx].SetId(self.CreateVehicleId())
                     print("Vehicle Ids %s" % (self.VehicleIds))
             elif lockState == "UNLOCKED":
-                print("Vehicle Id %d is unlocked and to be removed" % (vehicleId))
+                print("Vehicle Id %d is unlocked and will be removed" % (vehicleId))
+                unlockedVehicleIndices.append(idx)
                 if vehicleId != 0:
+                    # Prepare the unlocked vehicle for removing
                     self.VehicleIds.remove(vehicleId)
                     print("Vehicle Ids %s" % (self.VehicleIds))
-                unlockedVehicleIndices.append(idx)
-        for idx in unlockedVehicleIndices:
+        if len(unlockedVehicleIndices) > 0:
             # Remove unlocked vehicles
-            del self.Vehicles[idx]
+            newVehicles = []
+            for idx in range(len(self.Vehicles)):
+                if idx not in unlockedVehicleIndices:
+                    newVehicles.append(self.Vehicles[idx])
+            self.Vehicles = newVehicles
             print("Vehicle list length %d" % (len(self.Vehicles)))

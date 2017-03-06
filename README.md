@@ -10,7 +10,7 @@ The goals / steps of this project are the following:
 * Estimate a bounding box for vehicles detected.
 
 [//]: # (Image References)
-[image1]: ./examples/car_not_car.png
+[image1]: ./examples/class_examples.png
 [image2]: ./examples/HOG_example.jpg
 [image3]: ./examples/sliding_windows.jpg
 [image4]: ./examples/sliding_window.jpg
@@ -29,17 +29,29 @@ The goals / steps of this project are the following:
 
 You're reading it!
 
+
 ###Histogram of Oriented Gradients (HOG)
 
 ####1. Explain how (and identify where in your code) you extracted HOG features from the training images.
 
-The code for this step is contained in the first code cell of the IPython notebook (or in lines # through # of the file called `some_file.py`).  
-
-I started by reading in all the `vehicle` and `non-vehicle` images.  Here is an example of one of each of the `vehicle` and `non-vehicle` classes:
+The training images are loaded by the classifier class `TClassifier` defined in `classifier.py`. The class constructor recursively searches the provided directories with vehicle and non-vehicle images of resolution 64x64, then loads and labels the samples. Here's an example of vehicle and non-vehicle images:
 
 ![alt text][image1]
 
-I then explored different color spaces and different `skimage.hog()` parameters (`orientations`, `pixels_per_cell`, and `cells_per_block`).  I grabbed random images from each of the two classes and displayed them to get a feel for what the `skimage.hog()` output looks like.
+After loading the samples, the `TClassifier` constructor extracts HOG, spatial and color histogram features of each sample image using function `ExtractFeatures()` located in `feature_extraction.py`. The function essentially combines features extracted by three different methods:
+* `GetHogFeatures()`: Extracts HOG features of the image channel using `skimage.feature.hog`
+* `GetSpatialFeatures()`: Extracts spatial features of the image
+* `GetColorHistFeatures()`: Extracts color histogram features of the image
+
+I explored multiple color spaces and came up with the following rank of color spaces when training and testing the classifier with a single type (the test accuracy is shown in parentheses):
+
+| Feature Type | 1st place    | 2nd place      | 3rd place      |
+|--------------|--------------|----------------|----------------|
+| HOG          | HSV (0.9847) | HLS (0.9828)   | YCrCb (0.9809) |
+| Spatial      | RGB (0.8906) | YCrCb (0.8811) | YUV (0.8802)   |
+| Histogram    | HSV (0.9143) | HLS (0.9135)   | YCrCb (0.8915) |
+
+different color spaces and different `skimage.hog()` parameters (`orientations`, `pixels_per_cell`, and `cells_per_block`).  I grabbed random images from each of the two classes and displayed them to get a feel for what the `skimage.hog()` output looks like.
 
 Here is an example using the `YCrCb` color space and HOG parameters of `orientations=8`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`:
 

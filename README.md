@@ -11,7 +11,7 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 [image1]: ./examples/class_examples.png
-[image2]: ./examples/HOG_example.jpg
+[image2]: ./examples/feature_extraction.png
 [image3]: ./examples/sliding_windows.jpg
 [image4]: ./examples/sliding_window.jpg
 [image5]: ./examples/bboxes_and_heat.png
@@ -23,23 +23,23 @@ The goals / steps of this project are the following:
 ###Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
 
 ---
-###Writeup / README
+### Writeup / README
 
-####1. Provide a Writeup / README that includes all the rubric points and how you addressed each one.  You can submit your writeup as markdown or pdf.  [Here](https://github.com/udacity/CarND-Vehicle-Detection/blob/master/writeup_template.md) is a template writeup for this project you can use as a guide and a starting point.  
+#### 1. Provide a Writeup / README that includes all the rubric points and how you addressed each one.  You can submit your writeup as markdown or pdf.  [Here](https://github.com/udacity/CarND-Vehicle-Detection/blob/master/writeup_template.md) is a template writeup for this project you can use as a guide and a starting point.  
 
 You're reading it!
 
 
-###Histogram of Oriented Gradients (HOG)
+### Histogram of Oriented Gradients (HOG)
 
-####1. Explain how (and identify where in your code) you extracted HOG features from the training images.
+#### 1. Explain how (and identify where in your code) you extracted HOG features from the training images.
 
 The training images are loaded by the classifier class `TClassifier` defined in `classifier.py`. The class constructor recursively searches the provided directories with vehicle and non-vehicle images of resolution 64x64, then loads and labels the samples. Here's an example of vehicle and non-vehicle images:
 
 ![alt text][image1]
 
 After loading the samples, the `TClassifier` constructor extracts HOG, spatial and color histogram features of each sample image using function `ExtractFeatures()` located in `feature_extraction.py`. The function essentially combines features extracted by three different methods:
-* `GetHogFeatures()`: Extracts HOG features of the image channel using `skimage.feature.hog`
+* `GetHogFeatures()`: Extracts HOG features of the image channel using `skimage.feature.hog()`
 * `GetSpatialFeatures()`: Extracts spatial features of the image
 * `GetColorHistFeatures()`: Extracts color histogram features of the image
 
@@ -51,10 +51,18 @@ I explored multiple color spaces and came up with the following rank of color sp
 | Spatial      | RGB (0.8906) | YCrCb (0.8811) | YUV (0.8802)   |
 | Histogram    | HSV (0.9143) | HLS (0.9135)   | YCrCb (0.8915) |
 
-different color spaces and different `skimage.hog()` parameters (`orientations`, `pixels_per_cell`, and `cells_per_block`).  I grabbed random images from each of the two classes and displayed them to get a feel for what the `skimage.hog()` output looks like.
+First I tried different combination of the winning color spaces for concatenated HOG-Spatial-Histogram features: HSV-RGB-HSV, HLS-YCrCb-HLS and others. The test accuracy on the training set reached 0.9920, but the performance on the project video appeared to be bad: the guard rail on the bridge at 0:22-0.25s was stably falsely detected as a vehicle by windows of different sizes. Then I decided to pick YCrCb, which is the only winning color space in all three categories, for all types of features. The testing accuracy decreased a bit to 0.9900, but the number of false detections on the project video decreased significantly.
 
-Here is an example using the `YCrCb` color space and HOG parameters of `orientations=8`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`:
+Also I experimented with other meta parameters:
+* HOG parameters: number of orientations appeared to be good in range 7-9, cells per block is 2. Decreasing the values reduces accuracy significantly; increasing it doesn't improve accuracy, but affects performance.
+* Spatial sizes 16x16, 32x32 and 48x48 are almost equally good.
+* Color histogram, number of bins is only good as 32. Decreasing it affect accuracy; increasing doesn't improve anything, but affects performance.
 
+Here is an example using the YCrCb color space, HOG parameters of 9 orientations, 8 px per cell, 2 cells per block, spatial size 32x32 and 32 color histogram bins:
+
+<p align="center">
+    <img src="./examples/feature_extraction.png" alt="Feature Extraction" width="500"/>
+</p>
 
 ![alt text][image2]
 

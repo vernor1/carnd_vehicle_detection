@@ -33,7 +33,6 @@ You're reading it!
 ### Histogram of Oriented Gradients (HOG)
 
 #### 1. Explain how (and identify where in your code) you extracted HOG features from the training images.
-
 The training images are loaded by the classifier class `TClassifier` defined in `classifier.py`. The class constructor recursively searches the provided directories with vehicle and non-vehicle images of resolution 64x64, then loads and labels the samples. Here's an example of vehicle and non-vehicle images:
 
 <p align="center">
@@ -51,9 +50,7 @@ Here is an example using the YCrCb color space, HOG parameters of 9 orientations
     <img src="./examples/feature_extraction.png" alt="Feature Extraction" width="500"/>
 </p>
 
-
 #### 2. Explain how you settled on your final choice of HOG parameters.
-
 I explored multiple color spaces and came up with the following rank of color spaces when training and testing the classifier with a single type (average test accuracy after 5-10 runs is shown in parentheses):
 
 | Feature Type | 1st place    | 2nd place      | 3rd place      |
@@ -70,27 +67,27 @@ Also I experimented with other meta parameters:
 * Color histogram, number of bins is only good as 32. Decreasing it affect accuracy; increasing doesn't improve anything, but affects performance.
 
 #### 3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
-
 The classifier is implemented in `TClassifier` class defined in `classifier.py`. I used `sklearn.svm.LinearSVC` classifier trained with [vehicle](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/vehicles.zip) and [non-vehicle](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/non-vehicles.zip) sample images combined of [GTI](http://www.gti.ssr.upm.es/data/Vehicle_database.html) and [KITTI](http://www.cvlibs.net/datasets/kitti/) databases. The training and testing of the classifier is done right after normalizing the feature vectors in the end of `TClassifier` constructor.
 
+---
 ### Sliding Window Search
 
 #### 1. Describe how (and identify where in your code) you implemented a sliding window search.  How did you decide what scales to search and how much to overlap windows?
-
 The sliding window search is implemented in the private class method `TVehicleTracker::GetBoundingBoxes()` defined in `vehicle_tracker.py`. The method is able to handle multiple window sizes by scaling the image down while maintaining the same base window size of 64x64 px. This approach makes possible computing expensive HOG features once per whole image (per scale) and deriving HOG features of each window out of the whole image HOG features.
 I decided to search square windows of three sizes - 64, 96, 128 pixels - reliably capturing vehicles located far away with 64px windows, nearby vehicles with 128px windows, and everything in between with all three windows sizes. The corresponding scales for the base 64x64 window (see constant `TVehicleTracker::WINDOW_SIZE_PX`) are 1.0, 1.5, 2.0 defined by constant `TVehicleTracker::SCALES`. These multiple scales along with 75% overlapping produce a dense cluster of detection boxes on each vehicle, which makes the final vehicle detection easier by appying a heat map technique. The 75% window overlapping is defined by constant `TVehicleTracker::CELLS_PER_STEP = 2`, which is devided by window size in cells (8) resulting in 2/8=0.25 step, 0.75 overlapping.
 
 #### 2. Show some examples of test images to demonstrate how your pipeline is working.  What did you do to optimize the performance of your classifier?
+I searched on three scales (64, 96, 128 pixels) using YCrCb 3-channel HOG features plus spatially binned color and histograms of color in the feature vector, which provided a nice result. Also I tried to apply a heat map threshold (2+) to static images, assuming there are multiple detections of each vehicle in overlapping windows of different size. I works well with the test images (see below), but fails on distant vehicles, which are detected by a single window only. The static heat map has been replaced with a dynamic heat map history in the final variant of the project. See the pipeline performance on the test images:
 
-Ultimately I searched on two scales using YCrCb 3-channel HOG features plus spatially binned color and histograms of color in the feature vector, which provided a nice result.  Here are some example images:
+<p align="center">
+    <img src="./examples/vehicle_detection.png" alt="Vehicle Detection" width="750"/>
+</p>
 
-![alt text][image4]
 ---
-
 ### Video Implementation
 
-####1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
-Here's a [link to my video result](./project_video.mp4)
+#### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
+Here's a [link to my video result](https://youtu.be/cGvuKVzHfnY)
 
 
 ####2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.

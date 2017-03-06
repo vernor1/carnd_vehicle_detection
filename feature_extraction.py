@@ -39,7 +39,6 @@ def ExtractFeatures(img):
     normImg = np.empty_like(img)
     cv2.normalize(img, normImg, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
     # Extract HOG features
-#    hsvImg = cv2.cvtColor(normImg, cv2.COLOR_BGR2HSV)
     ycrcbImg = cv2.cvtColor(normImg, cv2.COLOR_BGR2YCrCb)
     hogFeatures = []
     for channelNr in range(ycrcbImg.shape[2]):

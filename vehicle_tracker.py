@@ -57,37 +57,55 @@ class TVehicleTracker():
                 return None
             return np.average(self.BoundingBoxHistory, axis=0).astype(np.uint16)
 
-        def Update(self, box):
+        def Update(self, boundingBoxes):
             if len(self.BoundingBoxHistory) == 0:
-                return False
-            averageBox = self.GetBoundingBox()
-            # Compute the distance between the center of new box and the center of own average box
-            distance = GetDistance(GetBoxCenter(box), GetBoxCenter(averageBox))
-            # The new box is accepted if the distance is below the threshold
-            if distance <= self.MAX_BOX_CENTER_DISTANCE:
-                self.BoundingBoxHistory.append(box)
-                self.IsUpdated = True
-                # Truncate the history if necessary
-                if len(self.BoundingBoxHistory) > self.MAX_HISTORY_LENGTH:
-                    self.BoundingBoxHistory.pop(0)
-                print("Vehicle updated, history length %d" % (len(self.BoundingBoxHistory)))
-                return True
-            return False
-
-        def CompleteUpdate(self):
-            if not self.IsUpdated:
+                return None
+            averageBoxCenter = GetBoxCenter(self.GetBoundingBox())
+            matchingBoxes = {}
+            for idx in range(len(boundingBoxes)):
+                # Compute the distance between the center of new box and the center of own average box
+                distance = GetDistance(GetBoxCenter(boundingBoxes[idx]), averageBoxCenter)
+                # The new box is matching if the distance is below the threshold
+                if distance <= self.MAX_BOX_CENTER_DISTANCE:
+                    matchingBoxes[distance] = idx
+            processedIdx = None
+            if len(matchingBoxes) == 0:
                 # If no boxes detected for the vehicle, reduce the history
                 if len(self.BoundingBoxHistory) > 0:
                     self.BoundingBoxHistory.pop(0)
-                print("Reduced history length %d" % (len(self.BoundingBoxHistory)))
-            if len(self.BoundingBoxHistory) == 0:
+                print("Updated vehicle Id %d, history length %d" % (self.Id, len(self.BoundingBoxHistory)))
+                if len(self.BoundingBoxHistory) == 0:
+                    # If the history is empty, consider the vehicle no longer locked
+                    self.IsLocked = False
+            else:
+                # Find the best match
+                processedIdx = matchingBoxes[sorted(matchingBoxes)[0]]
+                self.BoundingBoxHistory.append(boundingBoxes[processedIdx])
+                # Truncate the history if necessary
+                if len(self.BoundingBoxHistory) > self.MAX_HISTORY_LENGTH:
+                    self.BoundingBoxHistory.pop(0)
+                print("Updated vehicle Id %d, history length %d, best box %s" % (self.Id,
+                                                                                 len(self.BoundingBoxHistory),
+                                                                                 boundingBoxes[processedIdx],))
+                if len(self.BoundingBoxHistory) == self.MAX_HISTORY_LENGTH:
+                    # Once the history is full, the vehicle is locked
+                    self.IsLocked = True
+            return processedIdx
+
+#        def CompleteUpdate(self):
+#            if not self.IsUpdated:
+                # If no boxes detected for the vehicle, reduce the history
+#                if len(self.BoundingBoxHistory) > 0:
+#                    self.BoundingBoxHistory.pop(0)
+#                print("Reduced history length %d" % (len(self.BoundingBoxHistory)))
+#            if len(self.BoundingBoxHistory) == 0:
                 # If the history is empty, consider the vehicle no longer locked
-                self.IsLocked = False
-            elif len(self.BoundingBoxHistory) == self.MAX_HISTORY_LENGTH:
+#                self.IsLocked = False
+#            elif len(self.BoundingBoxHistory) == self.MAX_HISTORY_LENGTH:
                 # Once the history is full, the vehicle is locked
-                self.IsLocked = True
+#                self.IsLocked = True
             # Reset the flag in the end of the update transaction
-            self.IsUpdated = False
+#            self.IsUpdated = False
 
     # Constants ---------------------------------------------------------------
     PX_PER_CELL = 8
@@ -206,11 +224,16 @@ class TVehicleTracker():
             boundingBoxes.append(box)
         return boundingBoxes
 
-    def IsBoxValid(self, box):
-        width = box[1][0] - box[0][0]
-        height = box[1][1] - box[0][1]
-#        print("Box width %d, height %d" % (width, height))
-        return width >= self.MIN_BOX_WIDTH and height >= self.MIN_BOX_HEIGHT
+    def RemoveInvalidBoxes(self, boundingBoxes):
+        validBoxes = []
+        for box in boundingBoxes:
+            width = box[1][0] - box[0][0]
+            height = box[1][1] - box[0][1]
+            if width >= self.MIN_BOX_WIDTH and height >= self.MIN_BOX_HEIGHT:
+                validBoxes.append(box)
+            else:
+                print("Discard invalid box %s" % (box,))
+        return validBoxes
 
     def CreateVehicleId(self):
         for vehicleId in range(1, self.MAX_VEHICLE_ID):
@@ -224,23 +247,24 @@ class TVehicleTracker():
         self.Vehicles.append(self.TVehicle(box))
 
     def UpdateVehicles(self):
+        # Get all historical bounding boxes including possible false positives
         boundingBoxes = self.GetHistoricalBoundingBoxes()
+        # Remove invalid boxes
+        boundingBoxes = self.RemoveInvalidBoxes(boundingBoxes)
+        processedBoxIndices = set()
+        for vehicle in self.Vehicles:
+            # Ask every vehicle object to process bounding boxes
+            processedIdx = vehicle.Update(boundingBoxes)
+            if processedIdx != None:
+                processedBoxIndices.add(processedIdx)
         # Iterate through historical bounding boxes
-        for box in boundingBoxes:
-            if not self.IsBoxValid(box):
-                print("Discard invalid box %s" % (box,))
-                continue
-            isBoxAccepted = False
-            for vehicle in self.Vehicles:
-                if vehicle.Update(box):
-                    isBoxAccepted = True
-            # The valid box is not accepted by any vehicle, create a new vehicle
-            if not isBoxAccepted:
-                self.CreateVehicle(box)
-        unlockedIndices = []
+        for idx in range(len(boundingBoxes)):
+            if idx not in processedBoxIndices:
+                # The valid box is not processed by any vehicle, create a new vehicle
+                self.CreateVehicle(boundingBoxes[idx])
+        unlockedVehicleIndices = []
         for idx in range(len(self.Vehicles)):
             # Notify vehicles of completing the update
-            self.Vehicles[idx].CompleteUpdate()
             vehicleId = self.Vehicles[idx].GetId()
             lockState = self.Vehicles[idx].GetLockState()
             print("Checking vehicle Id %d, state %s" % (vehicleId, lockState))
@@ -253,8 +277,8 @@ class TVehicleTracker():
                 if vehicleId != 0:
                     self.VehicleIds.remove(vehicleId)
                     print("Vehicle Ids %s" % (self.VehicleIds))
-                unlockedIndices.append(idx)
-        for idx in unlockedIndices:
+                unlockedVehicleIndices.append(idx)
+        for idx in unlockedVehicleIndices:
             # Remove unlocked vehicles
             del self.Vehicles[idx]
             print("Vehicle list length %d" % (len(self.Vehicles)))

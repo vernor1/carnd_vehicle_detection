@@ -11,7 +11,7 @@ Classifier = TClassifier("vehicles", "non-vehicles")
 Tracker = TVehicleTracker(Classifier, (380, 660))
 
 # FIXME: remove
-FRAME_RANGE = range(560, 1261)
+FRAME_RANGE = range(660, 1261)
 FrameNr = 0
 
 # Functions ------------------------------------------------------------

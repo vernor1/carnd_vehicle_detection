@@ -31,9 +31,16 @@ class TVehicleTracker():
 
         # Public Members ------------------------------------------------------
         def __init__(self, box):
+            self.Id = 0
             self.BoundingBoxHistory = [box]
             self.IsLocked = False
             self.IsUpdated = True
+
+        def SetId(self, vehicleId):
+            self.Id = vehicleId
+
+        def GetId(self):
+            return self.Id
 
         def GetLockState(self):
             if self.IsLocked:
@@ -86,7 +93,7 @@ class TVehicleTracker():
     PX_PER_CELL = 8
     WINDOW_SIZE_PX = 64
     SCALES = [1.0, 1.5, 2.0]
-    MAX_HISTORY_LENGTH = 10
+    MAX_HISTORY_LENGTH = 12
     MAX_VEHICLE_ID = 20
     MIN_BOX_WIDTH = 48
     MIN_BOX_HEIGHT = 48
@@ -98,7 +105,8 @@ class TVehicleTracker():
         self.Classifier = classifier
         self.RangeY = rangeY
         self.HeatMapHistory = []
-        self.Vehicles = {}
+        self.VehicleIds = set()
+        self.Vehicles = []
 
     def ProcessImage(self, img):
         boundingBoxes = self.GetBoundingBoxes(img)
@@ -114,23 +122,10 @@ class TVehicleTracker():
     def GetVehicles(self):
         vehicleIds = []
         boundingBoxes = []
-        for vehicleId, vehicle in self.Vehicles.items():
+        for vehicle in self.Vehicles:
             if vehicle.GetLockState() == "LOCKED":
-                vehicleIds.append(vehicleId)
+                vehicleIds.append(vehicle.GetId())
                 boundingBoxes.append(vehicle.GetBoundingBox())
-
-#        labeledArray, numFeatures = self.GetLabels()
-        # Iterate through all detected vehicles
-#        for vehicleId in range(1, numFeatures + 1):
-            # Find pixels with each vehicle Id value
-#            nonZero = (labeledArray == vehicleId).nonzero()
-            # Identify x and y values of those pixels
-#            nonZeroY = np.array(nonZero[0])
-#            nonZeroX = np.array(nonZero[1])
-            # Define a bounding box based on min/max x and y
-#            box = (np.min(nonZeroX), np.min(nonZeroY)), (np.max(nonZeroX), np.max(nonZeroY))
-#            vehicleIds.append(vehicleId)
-#            boundingBoxes.append(box)
         return vehicleIds, boundingBoxes
 
     # Private Members ---------------------------------------------------------
@@ -140,9 +135,7 @@ class TVehicleTracker():
         img = img[self.RangeY[0]:self.RangeY[1], :, :]
         normImg = np.empty_like(img)
         cv2.normalize(img, normImg, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
-#        nrOfWindows = 0
         for scale in self.SCALES:
-#            print("Processing scale %.2f" % (scale))
             if scale == 1:
                 scaledImg = np.copy(normImg)
             else:
@@ -152,8 +145,6 @@ class TVehicleTracker():
                 cellsPerStep = 2
             else:
                 cellsPerStep = 2
-#            hsvImg = cv2.cvtColor(scaledImg, cv2.COLOR_BGR2HSV)
-#            hlsImg = cv2.cvtColor(scaledImg, cv2.COLOR_BGR2HLS)
             ycrcbImg = cv2.cvtColor(scaledImg, cv2.COLOR_BGR2YCrCb)
             nrOfBlocksX = scaledImg.shape[1] // self.PX_PER_CELL - 1
             nrOfBlocksY = scaledImg.shape[0] // self.PX_PER_CELL - 1
@@ -190,8 +181,6 @@ class TVehicleTracker():
                     if self.Classifier.Predict(featureList) == 1:
                         boundingBoxes.append(((trueWindowCoordX, trueWindowCoordY + self.RangeY[0]),
                                              (trueWindowCoordX + trueWindowSize, trueWindowCoordY + trueWindowSize + self.RangeY[0])))
-#                    nrOfWindows += 1
-#        print("Checked %d windows" % (nrOfWindows))
         return boundingBoxes
 
     def GetLabels(self):
@@ -223,12 +212,16 @@ class TVehicleTracker():
 #        print("Box width %d, height %d" % (width, height))
         return width >= self.MIN_BOX_WIDTH and height >= self.MIN_BOX_HEIGHT
 
-    def CreateVehicle(self, box):
+    def CreateVehicleId(self):
         for vehicleId in range(1, self.MAX_VEHICLE_ID):
-            if vehicleId not in self.Vehicles:
+            if vehicleId not in self.VehicleIds:
                 print("Creating vehicle Id %d" % (vehicleId))
-                self.Vehicles[vehicleId] = self.TVehicle(box)
-                return
+                self.VehicleIds.add(vehicleId)
+                return vehicleId
+
+    def CreateVehicle(self, box):
+        print("Creating nameless vehicle object")
+        self.Vehicles.append(self.TVehicle(box))
 
     def UpdateVehicles(self):
         boundingBoxes = self.GetHistoricalBoundingBoxes()
@@ -238,20 +231,30 @@ class TVehicleTracker():
                 print("Discard invalid box %s" % (box,))
                 continue
             isBoxAccepted = False
-            for vehicleId, vehicle in self.Vehicles.items():
+            for vehicle in self.Vehicles:
                 if vehicle.Update(box):
                     isBoxAccepted = True
             # The valid box is not accepted by any vehicle, create a new vehicle
             if not isBoxAccepted:
                 self.CreateVehicle(box)
-        unlockedVehicles = []
-        for vehicleId, vehicle in self.Vehicles.items():
-            print("Checking vehicle Id %d, lock state %s" % (vehicleId, vehicle.GetLockState()))
+        unlockedIndices = []
+        for idx in range(len(self.Vehicles)):
             # Notify vehicles of completing the update
-            vehicle.CompleteUpdate()
-            if vehicle.GetLockState() == "UNLOCKED":
+            self.Vehicles[idx].CompleteUpdate()
+            vehicleId = self.Vehicles[idx].GetId()
+            lockState = self.Vehicles[idx].GetLockState()
+            print("Checking vehicle Id %d, state %s" % (vehicleId, lockState))
+            if lockState == "LOCKED":
+                if vehicleId == 0:
+                    self.Vehicles[idx].SetId(self.CreateVehicleId())
+                    print("Vehicle Ids %s" % (self.VehicleIds))
+            elif lockState == "UNLOCKED":
                 print("Vehicle Id %d is unlocked and to be removed" % (vehicleId))
-                unlockedVehicles.append(vehicleId)
-        for vehicleId in unlockedVehicles:
+                if vehicleId != 0:
+                    self.VehicleIds.remove(vehicleId)
+                    print("Vehicle Ids %s" % (self.VehicleIds))
+                unlockedIndices.append(idx)
+        for idx in unlockedIndices:
             # Remove unlocked vehicles
-            del self.Vehicles[vehicleId]
+            del self.Vehicles[idx]
+            print("Vehicle list length %d" % (len(self.Vehicles)))

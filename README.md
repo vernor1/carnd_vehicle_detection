@@ -56,6 +56,8 @@ Also I experimented with other meta parameters:
 * Spatial sizes 16x16, 32x32 and 48x48 are almost equally good.
 * Color histogram, number of bins is only good as 32. Decreasing it affect accuracy; increasing doesn't improve anything, but affects performance.
 
+The total number of features in the final solution is more than 8k.
+
 #### 3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
 The classifier is implemented in `TClassifier` class defined in `classifier.py`. I used `sklearn.svm.LinearSVC` classifier trained with [vehicle](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/vehicles.zip) and [non-vehicle](https://s3.amazonaws.com/udacity-sdc/Vehicle_Tracking/non-vehicles.zip) sample images combined of [GTI](http://www.gti.ssr.upm.es/data/Vehicle_database.html) and [KITTI](http://www.cvlibs.net/datasets/kitti/) databases. The training and testing of the classifier is done right after normalizing the feature vectors in the end of `TClassifier` constructor.
 
@@ -64,7 +66,7 @@ The classifier is implemented in `TClassifier` class defined in `classifier.py`.
 
 #### 1. Describe how (and identify where in your code) you implemented a sliding window search.  How did you decide what scales to search and how much to overlap windows?
 The sliding window search is implemented in the private class method `TVehicleTracker::GetBoundingBoxes()` defined in `vehicle_tracker.py`. The method is able to handle multiple window sizes by scaling the image down while maintaining the same base window size of 64x64 px. This approach makes possible computing expensive HOG features once per whole image (per scale) and deriving HOG features of each window out of the whole image HOG features.
-I decided to search square windows of three sizes - 64, 96, 128 pixels - reliably capturing vehicles located far away with 64px windows, nearby vehicles with 128px windows, and everything in between with all three windows sizes. The corresponding scales for the base 64x64 window (see constant `TVehicleTracker::WINDOW_SIZE_PX`) are 1.0, 1.5, 2.0 defined by constant `TVehicleTracker::SCALES`. These multiple scales along with 75% overlapping produce a dense cluster of detection boxes on each vehicle, which makes the final vehicle detection easier by appying a heat map technique. The 75% window overlapping is defined by constant `TVehicleTracker::CELLS_PER_STEP = 2`, which is devided by window size in cells (8) resulting in 2/8=0.25 step, 0.75 overlapping.
+I decided to search square windows of three sizes - 64, 96, 128 pixels - reliably capturing vehicles located far away with 64px windows, nearby vehicles with 128px windows, and everything in between with all three windows sizes. The corresponding scales for the base 64x64 window (see constant `TVehicleTracker::WINDOW_SIZE_PX`) are 1.0, 1.5, 2.0 defined by constant `TVehicleTracker::SCALES`. These multiple scales along with 75% overlapping produce a dense cluster of detection boxes on each vehicle, which makes the final vehicle detection easier by appying a heat map technique. The 75% window overlapping is defined by constant `TVehicleTracker::CELLS_PER_STEP = 2`, which is devided by window size in cells (8) resulting in 2/8=0.25 step, 0.75 overlapping. The overall number of searched windows is almost 1.5k, which might be a bit too much for a laptop CPU, but it provided a good accuracy.
 
 #### 2. Show some examples of test images to demonstrate how your pipeline is working.  What did you do to optimize the performance of your classifier?
 I searched on three scales (64, 96, 128 pixels) using YCrCb 3-channel HOG features plus spatially binned color and histograms of color in the feature vector, which provided a nice result. Also I tried to apply a heat map threshold (2+) to static images, assuming there are multiple detections of each vehicle in overlapping windows of different size. I works well with the test images (see below), but fails on distant vehicles, which are detected by a single window only. The static heat map has been replaced with a dynamic heat map history in the final variant of the project. See the pipeline performance on the test images:
@@ -77,7 +79,7 @@ I searched on three scales (64, 96, 128 pixels) using YCrCb 3-channel HOG featur
 ### Video Implementation
 
 #### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
-Here's a [link to my video result](https://youtu.be/cGvuKVzHfnY)
+Here's a [link to my video result](https://youtu.be/cGvuKVzHfnY), and the processing [log](./video_processing_log.txt)
 
 
 #### 2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
@@ -87,7 +89,7 @@ I implemented a simplistic, yet reliable solution to track detected vehicles, fi
 1. `TVehicleTracker` class implements a "historical" heat map over last 8 frames of the video stream. The heat map is computed every frame as a sum of "historical" bounding boxes, see `GetHistoricalBoundingBoxes()`. The resulting heat map is thresholded by number of samples in the history (up to 8), and passed to `scipy.ndimage.measurements.label()` in order to identify independent connected components, presumably representing vehicles, see `GetLabels()`. The heat map history length of 8 is enough for producing reliable car detections, and not too long to produce "trails" of moving vehicles. This approach filters out most false positives, but the toughest ones handled in other way.
 2. `TVehicle` class implements the second stage of vehicle detection and tracking, given the "historical" bounding boxes produced by `TVehicleTracker`. An instance of `TVehicle` is created by method `TVehicleTracker::UpdateVehicles()` for each valid bounding box not accepted by any existing `TVehicle` instance. A bounding box is considered invalid, if any of its dimensions is below 48 px. An updated bounding box is accepted by a `TVehicle` instance in method `UpdateVehicle()`, if the distance between the vehicle center and the new bounding box center is below 128 px. In case of multiple occurences, only the closest bounding box is taken. `TVehicle` maintains a history of recent bounding boxes, computing the average boinding box, see `TVehicle::GetBoundingBox()`. A new `TVehicle` instance is not considered a true vehicle and not assigned an Id until the lock is acquired (state `LOCKED`), which happens only when the history is full. The value of 12 is chosen as half of the project video frame rate (25fps), meaning each vehicle is detected within 0.5s. This time is enough for a reliable detection of a real vehicle, but not that long for missing a danger. If the frame doesn't containg matching detections, the history truncates and the vehicle state changes to `LOCKING`, which handles short detection failures. Once the history gets empty, the vehicles is considered lost (state `UNLOCKED`) and gets removed by `TVehicleTracker`.
 
-The two-stage approach demontstrated a pretty good reliability and robustness to false positives. The following picture shows the result of processing a sequence of 7 stream pictures, using the approach above with a 7-frame `TVehicle` history:
+The two-stage approach revealed a pretty good reliability and robustness to false positives. The following picture shows the result of processing a sequence of 7 stream pictures, using the approach above with a 7-frame `TVehicle` history:
 
 <p align="center">
     <img src="./examples/vehicle_tracking.png" alt="Vehicle Detection" width="750"/>
@@ -95,7 +97,7 @@ The two-stage approach demontstrated a pretty good reliability and robustness to
 
 The execution log:
 ```
-(carnd-term1) Yurys-MacBook-Pro:vehicle_detection vernor$ python test.py vehicle_tracking --in_img "test_images/0*.jpg" --out_img examples/vehicle_tracking.png
+$ python test.py vehicle_tracking --in_img "test_images/0*.jpg" --out_img examples/vehicle_tracking.png
 Loading classifier data
 Processing 001.jpg
 Creating nameless vehicle object with box ((800, 380), (959, 523))
@@ -141,7 +143,18 @@ Vehicle Ids {1, 2}
 ---
 ### Discussion
 
-####1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
+#### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+The first issue I faced, was related to improperly chosen color spaces for extracting HOG, statial and histogram features. Even though the settings showed a descent classifier accuracy on the training set, but it produced a lot of false positives on the project video. I learned that it's very important to properly choose features and color spaces.
 
+Then I had to fight the toughest false positives, which were produced despite of the properly trained classifier and pretty decent thresholded heat map with labeling. That led to implementing a bit complex 2-stage vehicle tracking approach with a thresholded historical heat map in the 1st stage, and the boinding box history with vehicle locking in the 2nd stage.
+
+Those two problems made me thinking in two directions:
+1. I tried to figure out how to impelement a more sophisticated vehicle tracking algorithm with tracking vehicle speeds, positions, colors and shapes, predicting the moving direction and future vehicle positions.
+2. I'm curious, if a better classifier could help to fight false positives and detection failures. Perhaps a DNN could do better?.. I wish I had more time to experiment with it.
+
+Another problem I faced is overlapping views of the cars. First I tried to make up a better car tracking with a future position prediction. It might work with the project video, where cars don't change lanes and don't hide too long one behind another, but I remembered how long cars can be hiding behind trailers and trucks, sometimes taking an exit and never appearing in view. It's a very interesting problem.
+
+Another interesting problem is the windows searching performance. Number of searched windows in my implementation is almost 1.5k, and I extract more than 8k features, so the video processing performance is quite poor on my Intel i7 - about 1.7 seconds/frame. I'm curious about the hardware used in self-driving cars, if it's able to handle a real-time processing of the same amount of data.
+
+Also I could probably do better with the wobbly bounding boxes caused by the source detection boxes sampled on 8px cells.

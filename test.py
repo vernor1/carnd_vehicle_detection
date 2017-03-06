@@ -191,14 +191,12 @@ if __name__ == '__main__':
             row += 1
         vehicleIds, boundingBoxes = tracker.GetVehicles()
         print("%d vehicles found" % (len(vehicleIds)))
-        idx = 0
         for idx in range(len(vehicleIds)):
-            boxLeftTop = boundingBoxes[idx][0]
-            boxRightBottom = boundingBoxes[idx][1]
+            boxLeftTop = boundingBoxes[idx][0][0], boundingBoxes[idx][0][1]
+            boxRightBottom = boundingBoxes[idx][1][0], boundingBoxes[idx][1][1]
             cv2.rectangle(lastImg, boxLeftTop, boxRightBottom, (0, 255, 255), 3)
             cv2.putText(lastImg, "Vehicle %d" % (vehicleIds[idx]),
                         (boxLeftTop[0]+5, boxLeftTop[1]+25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
-            idx += 1
         subplots[row][0].imshow(cv2.cvtColor(lastImg, cv2.COLOR_BGR2RGB))
         subplots[row][0].set_title("Bounding Boxes of Last Image", fontsize=12)
         labeledArray, numFeatures = tracker.GetLabels()

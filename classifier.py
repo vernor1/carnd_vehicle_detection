@@ -53,7 +53,7 @@ class TClassifier():
                     featureList.append(ExtractFeatures(cv2.imread(fileName)))
                     labelList.append(0)
                 print("Total number of training samples %d" % (len(labelList)))
-                print("Saving the samples for fast access")
+                print("Saving samples for fast access")
                 trainingSet["featureList"] = featureList
                 trainingSet["labelList"] = labelList
                 pickle.dump(trainingSet, open(self.TRAINING_SET_FILE, "wb"))

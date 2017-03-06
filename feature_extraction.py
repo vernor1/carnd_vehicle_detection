@@ -39,13 +39,14 @@ def ExtractFeatures(img):
     normImg = np.empty_like(img)
     cv2.normalize(img, normImg, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
     # Extract HOG features
-    hsvImg = cv2.cvtColor(normImg, cv2.COLOR_BGR2HSV)
+#    hsvImg = cv2.cvtColor(normImg, cv2.COLOR_BGR2HSV)
+    ycrcbImg = cv2.cvtColor(normImg, cv2.COLOR_BGR2YCrCb)
     hogFeatures = []
-    for channelNr in range(hsvImg.shape[2]):
-        hogFeatures.append(GetHogFeatures(hsvImg[:,:,channelNr], nrOfOrientations=9, pxPerCell=8, cellPerBlk=2))
+    for channelNr in range(ycrcbImg.shape[2]):
+        hogFeatures.append(GetHogFeatures(ycrcbImg[:,:,channelNr], nrOfOrientations=9, pxPerCell=8, cellPerBlk=2))
     hogFeatures = np.ravel(hogFeatures)
     # Extract spatial features
-    spatialFeatures = GetSpatialFeatures(hsvImg, size=(32, 32))
+    spatialFeatures = GetSpatialFeatures(ycrcbImg, size=(32, 32))
     # Extract color histogram features
-    histFeatures = GetColorHistFeatures(cv2.cvtColor(normImg, cv2.COLOR_BGR2HLS), nrOfBins=32)
+    histFeatures = GetColorHistFeatures(ycrcbImg, nrOfBins=32)
     return np.concatenate((hogFeatures, spatialFeatures, histFeatures))

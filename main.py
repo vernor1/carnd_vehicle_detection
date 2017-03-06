@@ -6,12 +6,12 @@ from classifier import TClassifier
 from moviepy.editor import VideoFileClip
 from vehicle_tracker import TVehicleTracker
 
+
 # Global Variables ------------------------------------------------------------
 Classifier = TClassifier("vehicles", "non-vehicles")
 Tracker = TVehicleTracker(Classifier, (380, 660))
 
 # FIXME: remove
-FRAME_RANGE = range(660, 1261)
 FrameNr = 0
 
 # Functions ------------------------------------------------------------
@@ -23,19 +23,13 @@ def ProcessImage(img):
     returns: Processed RGB image
     """
 
+    # FIXME: remove
     global FrameNr
     FrameNr += 1
-    if FrameNr not in FRAME_RANGE:
-        return img
 
     # Convert the RGB image of MoviePy to BGR format of OpenCV
     outImg = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     # Process image and add overlay if any vehicles are detected
-
-#    boundingBoxes = Tracker.GetBoundingBoxes(outImg)
-#    for box in boundingBoxes:
-#        cv2.rectangle(outImg, box[0], box[1], (255, 0, 0), 2)
-
     Tracker.ProcessImage(outImg)
     vehicleIds, boundingBoxes = Tracker.GetVehicles()
     for idx in range(len(vehicleIds)):
@@ -44,6 +38,7 @@ def ProcessImage(img):
         cv2.rectangle(outImg, boxLeftTop, boxRightBottom, (0, 255, 255), 2)
         cv2.putText(outImg, "Vehicle %d" % (vehicleIds[idx]),
                     (boxLeftTop[0]+5, boxLeftTop[1]+15), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
+    # FIXME: remove
     cv2.imwrite("tmp/%04d.bmp" % (FrameNr), outImg)
     # Convert the processed image back to the RGB format comatible with MoviePy
     outImg = cv2.cvtColor(outImg, cv2.COLOR_BGR2RGB)

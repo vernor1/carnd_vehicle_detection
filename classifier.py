@@ -78,7 +78,17 @@ class TClassifier():
             pickle.dump(classifierData, open(self.CLASSIFIER_DATA_FILE, "wb"))
 
     def Normalize(self, featureList):
+        """ Normalizes a list of feature vectors by-column. The method must be applied to test features before predicting labels.
+
+        param: featureList: List of feature vectors
+        returns: Normalized feature vectors
+        """
         return self.Scaler.transform(featureList)
 
     def Predict(self, featureList):
+        """ Predicts labels of the given feature vectors.
+
+        param: featureList: List of feature vectors
+        returns: List of labels
+        """
         return self.Classifier.predict(featureList)
